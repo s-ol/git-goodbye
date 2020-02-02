@@ -1,0 +1,56 @@
+#!/bin/bash
+set -e
+
+# Get project name
+PROJECT="$PWD"
+PROJECT="${PROJECT#*/repositories/public/}"
+PROJECT="${PROJECT#*/repositories/}"
+PROJECT="${PROJECT%.git}"
+
+PUBLIC_URL="git.s-ol.nu/$PROJECT"
+GITHUB_URL="github.com/s-ol/$PROJECT"
+GITHUB_GIT="git@github.com:s-ol/$PROJECT.git"
+
+export GIT_DIR="$PWD"
+
+if [[ "$*" == *master* ]]; then
+  # remove goodbye branch
+  git branch -D goodbye || true
+
+  # find README*
+  README_FILE=$(git show master: | grep README | head -n 1)
+
+  if [ -z "$README_FILE" ]; then
+    echo -e "\e[1;32mCouldn't locate README at 'master'.\e[00m"
+    exit 1
+  fi
+
+  export GIT_WORK_TREE=/tmp/git/$PROJECT
+  mkdir -p "$GIT_WORK_TREE"
+
+  git checkout -q -f --orphan goodbye
+  cd "$GIT_WORK_TREE"
+  git rm -rfq --ignore-unmatch '*'
+  echo -e "\e[1;32mChecked out '$PROJECT'.\e[00m"
+
+  cat >"$README_FILE" <<EOF
+| notice | \
+this project has moved to a new home: [\`$PUBLIC_URL\`](//$PUBLIC_URL). \
+This github archive will however be kept up-to-date: \
+If you want to browse it here, switch on over to the [\`master\`](//$GITHUB_URL/tree/master/) branch. |
+| ------ | --- |
+
+---
+
+EOF
+  git show "master:$README_FILE" >>"$README_FILE"
+  echo -e "\e[1;32mCreated '$README_FILE'.\e[00m"
+
+  ls
+  git add "$README_FILE"
+  git commit -m "add goodbye message"
+  echo -e "\e[1;32m(Re-)committed godobye message.\e[00m"
+fi
+
+echo -e "\e[1;32mPushing to Github.\e[00m"
+git push --mirror "${GITHUB_GIT}"
